@@ -1,48 +1,59 @@
 // Home page — rendered at the site root URL (/)
-import Link from 'next/link'; // Client-side links (no full page reload)
-import Head from 'next/head'; // Edits the document <head> (tab title, meta, etc.)
-import Layout, { siteTitle } from '../components/layout'; // Shared layout + exported site title string
-import utilStyles from '../styles/utils.module.css'; // Reusable CSS module class names
-
-// Fetches latest posts from the WordPress REST endpoint
+import Link from 'next/link';
+import Head from 'next/head';
+import Layout, { siteTitle } from '../components/layout';
+import utilStyles from '../styles/utils.module.css';
 import { getSortedList } from '../lib/data';
 
-// Static Generation: runs once at build time on the server (not in the browser).
-// Whatever you return in props is passed into the page component below.
 export async function getStaticProps() {
-  const allPostsData = await getSortedList(); // Array of { id, name }
+  const allPostsData = await getSortedList();
   return {
     props: {
-      allPostsData, // Becomes the allPostsData argument on Home(...)
+      allPostsData,
     },
   };
 }
 
-// React page component for "/".
-// allPostsData comes from getStaticProps above.
-export default function Home({ allPostsData }) {
+function ItemList({ items }) {
+  if (!items.length) {
+    return <p>No items yet.</p>;
+  }
+
   return (
-    // home={true} → Layout shows the large homepage header (bigger photo + name)
+    <ul className={utilStyles.list}>
+      {items.map(({ id, name }) => (
+        <li className={utilStyles.listItem} key={id}>
+          <Link href={`/posts/${id}`}>{name}</Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export default function Home({ allPostsData }) {
+  const posts = allPostsData.filter((item) => item.type === 'post');
+  const games = allPostsData.filter((item) => item.type === 'game');
+  const consoles = allPostsData.filter((item) => item.type === 'console');
+
+  return (
     <Layout home>
       <Head>
-        {/* Text shown in the browser tab */}
         <title>{siteTitle}</title>
       </Head>
 
-      {/* Blog listing: heading + unordered list of posts */}
-      {/* Template literal combines two CSS module classes into one className string */}
       <section className={`${utilStyles.headingMd} ${utilStyles.padding1px}`}>
         <h2 className={utilStyles.headingLg}>Blog</h2>
-        <ul className={utilStyles.list}>
-          {/* .map() builds one <li> per post; destructure only the fields we need */}
-          {allPostsData.map(({ id, name }) => (
-            // key helps React track each list item; use a stable unique value (id)
-            <li className={utilStyles.listItem} key={id}>
-              {/* Dynamic route: /posts/1, /posts/2, etc. */}
-              <Link href={`/posts/${id}`}>{name}</Link>
-            </li>
-          ))}
-        </ul>
+        <ItemList items={posts} />
+      </section>
+
+      <section className={`${utilStyles.headingMd} ${utilStyles.padding1px}`}>
+        <h2 className={utilStyles.headingLg}>Games</h2>
+        <ItemList items={games} />
+      </section>
+
+      <section className={`${utilStyles.headingMd} ${utilStyles.padding1px}`}>
+        <h2 className={utilStyles.headingLg}>Consoles</h2>
+        <ItemList items={consoles} />
       </section>
     </Layout>
   );

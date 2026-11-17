@@ -22,24 +22,22 @@ export default function Post({ postData }) {
         <title>{postData.post_title}</title>
       </Head>
 
-      {/* Semantic wrapper for a single blog post */}
       <article>
-        {/* Large post heading */}
         <h1 className={utilStyles.headingXl}>{postData.post_title}</h1>
 
-        {/* Quieter secondary text for the publish date */}
+        {postData.type && postData.type !== 'post' && (
+          <p className={utilStyles.lightText}>
+            Type: {postData.type}
+          </p>
+        )}
+
         {dateString && (
           <div className={utilStyles.lightText}>
             <Date dateString={dateString} />
           </div>
         )}
 
-        {/*
-          Renders the WordPress post body as HTML.
-          post_content already includes HTML from WP.
-          dangerouslySetInnerHTML is required because React escapes HTML by default.
-        */}
-        <div dangerouslySetInnerHTML={{ __html: postData.post_content }} />
+        <div dangerouslySetInnerHTML={{ __html: postData.post_content || '' }} />
       </article>
     </Layout>
   );

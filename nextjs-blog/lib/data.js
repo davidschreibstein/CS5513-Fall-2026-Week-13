@@ -1,128 +1,113 @@
-// import fs from 'fs';
-// import path from 'path';
-
 // BEFORE USING got MUST DO: npm install got@9.6.0
 import got from 'got';
 
-// get filepath to data directory
-// const dataDir = path.join(process.cwd(), 'data');
+const WP_BASE = 'https://dev-cs-55-13-david-schreibstein.pantheonsite.io/wp-json';
 
-// define URL for rest endpoint
-const dataURL = "https://dev-cs-55-13-david-schreibstein.pantheonsite.io/wp-json/twentytwentyone-child/v1/latest-posts/1"
+// Regular posts (custom theme endpoint) + custom post types from WP REST
+const postsURL = `${WP_BASE}/twentytwentyone-child/v1/latest-posts/1`;
+const gamesURL = `${WP_BASE}/wp/v2/game`;
+const consolesURL = `${WP_BASE}/wp/v2/console`;
+
+async function fetchJson(url) {
+  try {
+    const response = await got(url);
+    console.log(response.body);
+    const data = JSON.parse(response.body);
+    return Array.isArray(data) ? data : [data];
+  } catch (error) {
+    console.log(error);
+    return [];
+  }
+}
+
+// Normalize WP REST CPT items and custom latest-posts items into one shape
+function normalizeItem(item) {
+  const type = item.post_type || item.type || 'post';
+  const id = (item.ID ?? item.id).toString();
+  const title =
+    item.post_title ||
+    item.title?.rendered ||
+    item.acf?.game_name ||
+    '';
+  const dateRaw = item.post_date || item.date || '';
+  const post_date = dateRaw.includes('T')
+    ? dateRaw.replace('T', ' ').slice(0, 19)
+    : dateRaw;
+
+  let post_content = item.post_content || item.content?.rendered || '';
+  if (!post_content && item.acf) {
+    const description = item.acf.decription || item.acf.description || '';
+    const year = item.acf.year_of_releaste;
+    post_content = description ? `<p>${description}</p>` : '';
+    if (year) {
+      post_content += `<p>Year of release: ${year}</p>`;
+    }
+  }
+
+  return {
+    id,
+    name: title,
+    post_title: title,
+    post_content,
+    post_date,
+    type,
+    acf: item.acf || null,
+  };
+}
+
+async function getAllContent() {
+  const [posts, games, consoles] = await Promise.all([
+    fetchJson(postsURL),
+    fetchJson(gamesURL),
+    fetchJson(consolesURL),
+  ]);
+
+  return [...posts, ...games, ...consoles].map(normalizeItem);
+}
 
 // function returns ids for all json objects in array
 export async function getAllIds() {
-  // get filepath to json file
-  // const filePath = path.join(dataDir, 'persons.json');
+  const jsonObj = await getAllContent();
 
-  // load json file contents
-  // const jsonString = fs.readFileSync(filePath, 'utf8');
-  let jsonString;
-  try {
-    // next line uses got synchronously to retrive via https our json data from wp site
-    jsonString = await got(dataURL);
-    console.log(jsonString.body);
-  } catch(error) {
-    jsonString = { body: '[]' };
-    console.log(error);
-  }
-
-  // convert string from file into json array object
-  // const jsonObj = JSON.parse(jsonString);
-  const jsonObj = JSON.parse(jsonString.body);
-
-  // use map() on array to extract just id properties into new array of obj values
-  return jsonObj.map(item => {
+  return jsonObj.map((item) => {
     return {
       params: {
-        id: item.ID.toString()
-      }
-    }
+        id: item.id,
+      },
+    };
   });
-  // above code returns an array with nested obj values that looks like this:
-  // [
-  //   {
-  //     params: {
-  //       id: 3
-  //     }
-  //   },
-  //   {
-  //     params: {
-  //       id: 2
-  //     }
-  //   }
-  // ]
 }
 
 // function returns names and ids for all json objects in array, sorted by name property
 export async function getSortedList() {
-  // get filepath to json file
-  // const filePath = path.join(dataDir, 'persons.json');
+  const jsonObj = await getAllContent();
 
-  // load json file contents
-  // const jsonString = fs.readFileSync(filePath, 'utf8');
-  let jsonString;
-  try {
-    // next line uses got synchronously to retrive via https our json data from wp site
-    jsonString = await got(dataURL);
-    console.log(jsonString.body);
-  } catch(error) {
-    jsonString = { body: '[]' };
-    console.log(error);
-  }
-  
-  // convert string from file into json array object
-  // const jsonObj = JSON.parse(jsonString);
-  const jsonObj = JSON.parse(jsonString.body);
-
-  // sort json array by name property
   jsonObj.sort(function (a, b) {
-      return a.post_title.localeCompare(b.post_title);
+    return a.name.localeCompare(b.name);
   });
 
-  // use map() on array to extract just id + name properties into new array of obj values
-  return jsonObj.map(item => {
+  return jsonObj.map((item) => {
     return {
-      id: item.ID.toString(),
-      name: item.post_title
-    }
+      id: item.id,
+      name: item.name,
+      type: item.type,
+    };
   });
 }
 
 export async function getData(idRequested) {
-  // get filepath to json file
-  // const filePath = path.join(dataDir, 'persons.json');
+  const jsonObj = await getAllContent();
 
-  // load json file contents
-  // const jsonString = fs.readFileSync(filePath, 'utf8');
-  let jsonString;
-  try {
-    // next line uses got synchronously to retrive via https our json data from wp site
-    jsonString = await got(dataURL);
-    console.log(jsonString.body);
-  } catch(error) {
-    jsonString = { body: '[]' };
-    console.log(error);
-  }
-
-  // convert string from file into json array object
-  // const jsonObj = JSON.parse(jsonString);
-  const jsonObj = JSON.parse(jsonString.body);
-
-  // find object value in array that has matching id
-  const objMatch = jsonObj.filter(obj => {
-    return obj.ID.toString() === idRequested;
+  const objMatch = jsonObj.filter((obj) => {
+    return obj.id === idRequested;
   });
 
-  // extract object value in filtered array if any
   let objReturned;
   if (objMatch.length > 0) {
     objReturned = objMatch[0];
   } else {
     objReturned = {};
   }
-  // console.log(objReturned);
 
-  // return object value found
   return objReturned;
 }
